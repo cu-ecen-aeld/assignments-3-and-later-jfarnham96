@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 if [ "$#" -ne 2 ]; then
     echo "ERROR - please specify 2 arguments. 1: filesdir, 2: searchstr"
