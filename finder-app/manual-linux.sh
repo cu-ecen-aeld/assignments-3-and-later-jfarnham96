@@ -101,7 +101,6 @@ sudo mknod -m 620 dev/console c 5 1
 
 # TODO: Clean and build the writer utility
 cd ${CALLING_DIR}
-make clean
 make ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE}
 cp writer ${OUTDIR}/rootfs/home/
 
