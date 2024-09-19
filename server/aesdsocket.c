@@ -31,7 +31,6 @@ typedef struct thread_info_s {
 
 pthread_mutex_t mutex;
 SLIST_HEAD(slisthead, thread_info_s) head;
-bool clean_threads = false;
 
 void init_queue(void);
 void add_thread(void* (*thread_function)(void*), thread_info_t* thread_data);
@@ -54,12 +53,24 @@ int main(int argc, char** argv) {
 		run_as_daemon = 1;
 	}
 
-	signal(SIGINT, signal_handler);
-	signal(SIGTERM, signal_handler);
+	sigset_t signal_set;
+	sigemptyset(&signal_set);
+	sigaddset(&signal_set, SIGINT);
+	sigaddset(&signal_set, SIGTERM);
+
+	struct sigaction sa;
+	sa.sa_handler = signal_handler;
+	sigemptyset(&sa.sa_mask);
+	sa.sa_flags = 0;
+	sigaction(SIGINT, &sa, NULL);
+	sigaction(SIGTERM, &sa, NULL);
+
+	//signal(SIGINT, signal_handler);
+	//signal(SIGTERM, signal_handler);
 
 	server_socket_fd = socket(PF_INET, SOCK_STREAM, 0);
 	if(server_socket_fd == -1) {
-		syslog(LOG_ERR, "ERROR - socket created failed");
+		syslog(LOG_ERR, "ERROR - socket creation failed");
 		closelog();
 		return -1;
 	}
@@ -121,18 +132,9 @@ int main(int argc, char** argv) {
 	socklen_t client_addr_len = sizeof(client_sockaddrin);
 
 	while(1) {
-		if(clean_threads) {
-			syslog(LOG_INFO, "CLEANING");
-			cleanup();
-			remove_threads();
-			return 0;
-		}
 		client_socket_fd = accept(server_socket_fd, (struct sockaddr*)&client_sockaddrin, &client_addr_len);
 		if(client_socket_fd == -1) {
 			continue;
-			//syslog(LOG_ERR, "ERROR - accept failed");
-			//cleanup();
-			//return -1;
 		}
 
 		char client_ip_addr[INET_ADDRSTRLEN];
@@ -163,7 +165,6 @@ void add_thread(void* (*thread_function)(void*), thread_info_t* thread_data) {
 		cleanup();
 		return;
 	}
-	syslog(LOG_INFO, "add thread: %ld", thread_data->thread);
 	SLIST_INSERT_HEAD(&head, thread_data, next);
 }
 
@@ -172,7 +173,6 @@ void check_threads() {
 	thread_info_t* tmpData = NULL;
 	SLIST_FOREACH_SAFE(data, &head, next, tmpData) {
 		if(data->thread_complete) {
-			syslog(LOG_INFO, "remove thread: %ld", data->thread);
 			pthread_join(data->thread, NULL);
 			SLIST_REMOVE(&head, data, thread_info_s, next);
 			free(data);
@@ -187,6 +187,7 @@ void remove_threads() {
 	thread_info_t* data;
 	thread_info_t* tmpData = NULL;
 	SLIST_FOREACH_SAFE(data, &head, next, tmpData) {
+		pthread_cancel(data->thread);
 		pthread_join(data->thread, NULL);
 		SLIST_REMOVE(&head, data, thread_info_s, next);
 		free(data);
@@ -197,6 +198,12 @@ void remove_threads() {
 }
 
 void* print_time(void* data) {
+	sigset_t signal_set;
+    sigemptyset(&signal_set);
+    sigaddset(&signal_set, SIGINT);
+    sigaddset(&signal_set, SIGTERM);
+	pthread_sigmask(SIG_BLOCK, &signal_set, NULL);
+
 	while(1) {
 		sleep(10);
 		struct timespec now;
@@ -215,6 +222,12 @@ void* print_time(void* data) {
 }
 
 void* receive_data(void* thread_param) {
+	sigset_t signal_set;
+    sigemptyset(&signal_set);
+    sigaddset(&signal_set, SIGINT);
+    sigaddset(&signal_set, SIGTERM);
+	pthread_sigmask(SIG_BLOCK, &signal_set, NULL);
+
 	thread_info_t* thread_args = (thread_info_t*) thread_param;
 	int client_socket_fd = thread_args->client_socket_fd;
 	
@@ -317,6 +330,6 @@ void cleanup() {
 
 	pthread_mutex_destroy(&mutex);
 	closelog();
-	clean_threads = true;
+	remove_threads();
 }
 
