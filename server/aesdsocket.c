@@ -161,7 +161,8 @@ void add_thread(void* (*thread_function)(void*), thread_info_t* thread_data) {
 
 void check_threads() {
 	thread_info_t* data;
-	SLIST_FOREACH(data, &head, next) {
+	thread_info_t* tmpData = NULL;
+	SLIST_FOREACH_SAFE(data, &head, next, tmpData) {
 		if(data->thread_complete) {
 			syslog(LOG_INFO, "remove thread: %ld", data->thread);
 			pthread_join(data->thread, NULL);
