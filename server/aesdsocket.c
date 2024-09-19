@@ -64,13 +64,21 @@ int main(int argc, char** argv) {
 		return -1;
 	}
 
+	int opt = 1;
+	int ret = setsockopt(server_socket_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+	if(ret) {
+		syslog(LOG_ERR, "ERROR - allow socket reuse failed");
+		cleanup();
+		return -1;
+	}
+
 	struct sockaddr_in server_sockaddrin;
 	memset(&server_sockaddrin, 0, sizeof(server_sockaddrin));
 	server_sockaddrin.sin_family = PF_INET;
 	server_sockaddrin.sin_addr.s_addr = INADDR_ANY;
 	server_sockaddrin.sin_port = htons(9000);
 
-	int ret = bind(server_socket_fd, (struct sockaddr*)&server_sockaddrin, sizeof(server_sockaddrin));
+	ret = bind(server_socket_fd, (struct sockaddr*)&server_sockaddrin, sizeof(server_sockaddrin));
 	if(ret == -1) {
 		syslog(LOG_ERR, "ERROR - bind failed");
 		cleanup();
