@@ -6,7 +6,7 @@ ifeq ($(CROSS_COMPILE), aarch64-none-linux-gnu-)
 endif
 
 all:
-		$(CC) $(CFLAGS) -g aesdsocket.c -o aesdsocket
+		$(CC) $(CFLAGS) aesdsocket.c -o aesdsocket
 
 clean:
 		rm -f aesdsocket
