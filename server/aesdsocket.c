@@ -296,7 +296,8 @@ void* receive_data(void* thread_param) {
 	close(client_socket_fd);
 	thread_args->thread_complete = true;	
 
-	pthread_exit((void*)thread_args);
+	//pthread_exit((void*)thread_args);
+	return (void*)thread_args;
 }
 
 void signal_handler(int sig) {
