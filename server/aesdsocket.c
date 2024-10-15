@@ -43,6 +43,13 @@ void* receive_data(void* thread_param);
 void signal_handler(int sig);
 void cleanup(void);
 
+#ifdef USE_AESD_CHAR_DEVICE
+static const char* path = "/dev/aesdchar";
+#else
+static const char* path = "/var/tmp/aesdsocketdata";
+#endif
+
+
 int main(int argc, char** argv) {
 
 	openlog("socket", LOG_PID | LOG_CONS, LOG_USER);
@@ -126,9 +133,11 @@ int main(int argc, char** argv) {
 		return -1;
 	}
 
+#ifdef USE_AESD_CHAR_DEVICE
 	thread_info_t* thread_data = (thread_info_t*) malloc(sizeof(thread_info_t));
 	thread_data->thread_complete = false;
 	add_thread(print_time, thread_data);
+#endif
 	socklen_t client_addr_len = sizeof(client_sockaddrin);
 
 	while(1) {
@@ -214,7 +223,7 @@ void* print_time(void* data) {
 		memmove(timestamp + strlen(timestamp), buffer, strlen(buffer) + 1);
 
 		pthread_mutex_lock(&mutex);
-		int file_fd = open("/var/tmp/aesdsocketdata", O_WRONLY | O_APPEND | O_CREAT, S_IRWXU | S_IRWXG | S_IROTH);
+		int file_fd = open(path, O_WRONLY | O_APPEND | O_CREAT, S_IRWXU | S_IRWXG | S_IROTH);
 		write(file_fd, timestamp, strlen(timestamp));
 		write(file_fd, "\n", 1);
 		pthread_mutex_unlock(&mutex);	
@@ -231,9 +240,9 @@ void* receive_data(void* thread_param) {
 	thread_info_t* thread_args = (thread_info_t*) thread_param;
 	int client_socket_fd = thread_args->client_socket_fd;
 	
-	int file_fd = open("/var/tmp/aesdsocketdata", O_WRONLY | O_APPEND | O_CREAT, S_IRWXU | S_IRWXG | S_IROTH);
+	int file_fd = open(path, O_WRONLY | O_APPEND | O_CREAT, S_IRWXU | S_IRWXG | S_IROTH);
 	if(file_fd == -1) {
-		syslog(LOG_ERR, "ERROR - creating /var/tmp/aesdsocketdata failed");
+		syslog(LOG_ERR, "ERROR - creating %s failed", path);
 		cleanup();
 		exit(1);
 	}
@@ -250,7 +259,7 @@ void* receive_data(void* thread_param) {
 			int write_status = write(file_fd, receive_buffer, bytes_received);
 			pthread_mutex_unlock(&mutex);
 			if(write_status == -1) {
-				syslog(LOG_ERR, "ERROR - writing w/o newline to /var/tmp/aesdsocketdata failed");
+				syslog(LOG_ERR, "ERROR - writing w/o newline to %s failed", path);
 				close(file_fd);
 				cleanup();
 				exit(1);
@@ -262,7 +271,7 @@ void* receive_data(void* thread_param) {
 			int write_status = write(file_fd, receive_buffer, newline_char - receive_buffer);
 			pthread_mutex_unlock(&mutex);
 			if(write_status == -1) {
-				syslog(LOG_ERR, "ERROR - writing w/ newline to /var/tmp/aesdsocketdata failed");
+				syslog(LOG_ERR, "ERROR - writing w/ newline to %s failed", path);
 				close(file_fd);
 				cleanup();
 				exit(1);
@@ -272,9 +281,9 @@ void* receive_data(void* thread_param) {
 			pthread_mutex_unlock(&mutex);
 			close(file_fd);
 
-			file_fd = open("/var/tmp/aesdsocketdata", O_RDONLY, S_IRWXU | S_IRWXG | S_IROTH);
+			file_fd = open(path, O_RDONLY, S_IRWXU | S_IRWXG | S_IROTH);
 			if(file_fd == -1) {
-				syslog(LOG_ERR, "ERROR - open for read /var/tmp/aesdsocketdata failed");
+				syslog(LOG_ERR, "ERROR - open for read %s failed", path);
 				close(client_socket_fd);
 				cleanup();
 				exit(1);
@@ -314,10 +323,12 @@ void signal_handler(int sig) {
 }
 
 void cleanup() {
-	int remove_status = remove("/var/tmp/aesdsocketdata");
+#ifndef USE_AESD_CHAR_DEVICE
+	int remove_status = remove(path);
 	if(remove_status) {
 		syslog(LOG_ERR, "ERROR - failed to remove file at cleanup");
 	}
+#endif
 
 	if(server_socket_fd != -1) {
 		close(server_socket_fd);
