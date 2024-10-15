@@ -15,6 +15,7 @@
 #include <stdbool.h>
 #include <time.h>
 #include "queue.h"
+#include "../aesd-char-driver/aesd_ioctl.h"
 
 int server_socket_fd = -1;
 int client_socket_fd = -1;
@@ -133,7 +134,7 @@ int main(int argc, char** argv) {
 		return -1;
 	}
 
-#ifdef USE_AESD_CHAR_DEVICE
+#ifndef USE_AESD_CHAR_DEVICE
 	thread_info_t* thread_data = (thread_info_t*) malloc(sizeof(thread_info_t));
 	thread_data->thread_complete = false;
 	add_thread(print_time, thread_data);
@@ -266,27 +267,39 @@ void* receive_data(void* thread_param) {
 			}
 		}
 		else {
-			*newline_char = '\0';
-			pthread_mutex_lock(&mutex);
-			int write_status = write(file_fd, receive_buffer, newline_char - receive_buffer);
-			pthread_mutex_unlock(&mutex);
-			if(write_status == -1) {
-				syslog(LOG_ERR, "ERROR - writing w/ newline to %s failed", path);
-				close(file_fd);
-				cleanup();
-				exit(1);
-			}
-			pthread_mutex_lock(&mutex);
-			write(file_fd, "\n", 1);
-			pthread_mutex_unlock(&mutex);
-			close(file_fd);
-
-			file_fd = open(path, O_RDONLY, S_IRWXU | S_IRWXG | S_IROTH);
+			file_fd = open(path, O_RDWR, S_IRWXU | S_IRWXG | S_IROTH);
 			if(file_fd == -1) {
-				syslog(LOG_ERR, "ERROR - open for read %s failed", path);
+				syslog(LOG_ERR, "ERROR - open for rw %s failed", path);
 				close(client_socket_fd);
 				cleanup();
 				exit(1);
+			}
+
+			const char* ioc_seek = "AESDCHAR_IOCSEEKTO";
+			if(strstr(receive_buffer, ioc_seek)) {
+				struct aesd_seekto seekto;
+				sscanf(receive_buffer, "AESDCHAR_IOCSEEKTO"":%d,%d", &seekto.write_cmd, &seekto.write_cmd_offset);
+				
+				if (ioctl(file_fd, AESDCHAR_IOCSEEKTO, &seekto) < 0) {
+					perror("ioctl");
+					syslog(LOG_ERR, "ioctl error");
+				}
+			}
+
+			else {
+				*newline_char = '\0';
+				pthread_mutex_lock(&mutex);
+				int write_status = write(file_fd, receive_buffer, newline_char - receive_buffer);
+				pthread_mutex_unlock(&mutex);
+				if(write_status == -1) {
+					syslog(LOG_ERR, "ERROR - writing w/ newline to %s failed", path);
+					close(file_fd);
+					cleanup();
+					exit(1);
+				}
+				pthread_mutex_lock(&mutex);
+				write(file_fd, "\n", 1);
+				pthread_mutex_unlock(&mutex);
 			}
 
 			char read_buffer[512];
