@@ -137,7 +137,7 @@ int main(int argc, char** argv) {
 #ifndef USE_AESD_CHAR_DEVICE
 	thread_info_t* thread_data = (thread_info_t*) malloc(sizeof(thread_info_t));
 	thread_data->thread_complete = false;
-	add_thread(print_time, thread_data);
+	//add_thread(print_time, thread_data);
 #endif
 	socklen_t client_addr_len = sizeof(client_sockaddrin);
 
