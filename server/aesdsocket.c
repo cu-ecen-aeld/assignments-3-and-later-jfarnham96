@@ -241,7 +241,7 @@ void* receive_data(void* thread_param) {
 	thread_info_t* thread_args = (thread_info_t*) thread_param;
 	int client_socket_fd = thread_args->client_socket_fd;
 	
-	int file_fd = open(path, O_WRONLY | O_APPEND | O_CREAT, S_IRWXU | S_IRWXG | S_IROTH);
+	int file_fd = open(path, O_RDWR | O_APPEND | O_CREAT, S_IRWXU | S_IRWXG | S_IROTH);
 	if(file_fd == -1) {
 		syslog(LOG_ERR, "ERROR - creating %s failed", path);
 		cleanup();
@@ -267,14 +267,6 @@ void* receive_data(void* thread_param) {
 			}
 		}
 		else {
-			file_fd = open(path, O_RDWR, S_IRWXU | S_IRWXG | S_IROTH);
-			if(file_fd == -1) {
-				syslog(LOG_ERR, "ERROR - open for rw %s failed", path);
-				close(client_socket_fd);
-				cleanup();
-				exit(1);
-			}
-
 			const char* ioc_seek = "AESDCHAR_IOCSEEKTO";
 			if(strstr(receive_buffer, ioc_seek)) {
 				struct aesd_seekto seekto;
