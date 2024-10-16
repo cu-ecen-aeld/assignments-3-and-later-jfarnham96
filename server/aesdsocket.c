@@ -44,6 +44,8 @@ void* receive_data(void* thread_param);
 void signal_handler(int sig);
 void cleanup(void);
 
+#define USE_AESD_CHAR_DEVICE 1
+
 #ifdef USE_AESD_CHAR_DEVICE
 static const char* path = "/dev/aesdchar";
 #else
