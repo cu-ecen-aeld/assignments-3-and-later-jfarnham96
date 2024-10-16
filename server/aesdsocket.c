@@ -255,17 +255,6 @@ void* receive_data(void* thread_param) {
 	while ((bytes_received = recv(client_socket_fd, receive_buffer, sizeof(receive_buffer) - 1, 0)) > 0) {
 		char* newline_char = strchr(receive_buffer, '\n');
 		if(newline_char == NULL) {
-			const char* ioc_seek = "AESDCHAR_IOCSEEKTO";
-			if(strstr(receive_buffer, ioc_seek)) {
-				struct aesd_seekto seekto;
-				sscanf(receive_buffer, "AESDCHAR_IOCSEEKTO"":%d,%d", &seekto.write_cmd, &seekto.write_cmd_offset);
-				
-				if (ioctl(file_fd, AESDCHAR_IOCSEEKTO, &seekto) < 0) {
-					perror("ioctl");
-					syslog(LOG_ERR, "ioctl error");
-				}
-			}
-			else {
 			// No new line character
 			pthread_mutex_lock(&mutex);
 			int write_status = write(file_fd, receive_buffer, bytes_received);
@@ -276,13 +265,11 @@ void* receive_data(void* thread_param) {
 				cleanup();
 				exit(1);
 			}
-			}
 		}
 		else {
-			const char* ioc_seek = "AESDCHAR_IOCSEEKTO";
-			if(strstr(receive_buffer, ioc_seek)) {
+			if(strstr(receive_buffer, "AESDCHAR_IOCSEEKTO:")) {
 				struct aesd_seekto seekto;
-				sscanf(receive_buffer, "AESDCHAR_IOCSEEKTO"":%d,%d", &seekto.write_cmd, &seekto.write_cmd_offset);
+				sscanf(receive_buffer, "AESDCHAR_IOCSEEKTO:%d,%d", &seekto.write_cmd, &seekto.write_cmd_offset);
 				
 				if (ioctl(file_fd, AESDCHAR_IOCSEEKTO, &seekto) < 0) {
 					perror("ioctl");
